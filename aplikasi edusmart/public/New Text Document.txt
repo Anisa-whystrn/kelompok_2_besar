@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Guru - Edusmart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-gray-50">
+  <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-4 px-4 shadow-md">
+    <a href="index.html" class="text-white text-sm underline">&larr; Kembali</a>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-8">
+    <!-- Form Awal -->
+    <section id="form-section" class="bg-white p-6 rounded-xl shadow mb-8">
+      <h2 class="text-xl font-bold mb-4">Masukkan Nama Anda</h2>
+      <input type="text" id="namaGuru" placeholder="Nama Lengkap" class="w-full px-4 py-2 border rounded mb-4" />
+      <button onclick="daftarGuru()" class="bg-blue-600 text-white px-6 py-2 rounded">Lanjutkan</button>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="hidden">
+      <div class="bg-white p-6 rounded-xl shadow mb-6">
+        <h2 class="text-2xl font-bold">Halo, <span id="namaTampil"></span>!</h2>
+        <p class="mt-2">Kode Unik Anda: <span id="kodeTampil" class="font-mono bg-blue-100 px-2 py-1 rounded"></span></p>
+        <p class="text-sm text-gray-500 mt-2">Bagikan kode kelas & password ke siswa.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <button onclick="toggleForm('kelas')" class="bg-green-600 text-white py-2 rounded">+ Buat Kelas</button>
+        <button onclick="toggleForm('soal')" class="bg-purple-600 text-white py-2 rounded">+ Buat Soal</button>
+      </div>
+
+      <!-- Form Kelas -->
+      <section id="form-kelas" class="hidden bg-white p-4 rounded shadow mb-6">
+        <h3 class="font-bold mb-2">Buat Kelas</h3>
+        <input type="text" id="namaKelas" placeholder="Nama Kelas" class="w-full px-2 py-1 border rounded mb-2" />
+        <textarea id="descKelas" placeholder="Deskripsi (opsional)" class="w-full px-2 py-1 border rounded mb-2"></textarea>
+        <div class="flex gap-2">
+          <button onclick="simpanKelas()" class="bg-green-600 text-white px-3 py-1 rounded">Simpan</button>
+          <button onclick="toggleForm('kelas')" class="bg-gray-300 px-3 py-1 rounded">Batal</button>
+        </div>
+      </section>
+
+      <!-- Form Soal -->
+      <section id="form-soal" class="hidden bg-white p-4 rounded shadow mb-6">
+        <h3 class="font-bold mb-2">Buat Soal Pilihan Ganda</h3>
+        <input type="text" id="teksSoal" placeholder="Soal" class="w-full px-2 py-1 border rounded mb-2" />
+        <input type="text" id="opsiA" placeholder="A. ..." class="w-full px-2 py-1 border rounded mb-2" />
+        <input type="text" id="opsiB" placeholder="B. ..." class="w-full px-2 py-1 border rounded mb-2" />
+        <input type="text" id="opsiC" placeholder="C. ..." class="w-full px-2 py-1 border rounded mb-2" />
+        <input type="text" id="opsiD" placeholder="D. ..." class="w-full px-2 py-1 border rounded mb-2" />
+        <select id="jawabanBenar" class="w-full px-2 py-1 border rounded mb-2">
+          <option value="A">Jawaban Benar: A</option>
+          <option value="B">Jawaban Benar: B</option>
+          <option value="C">Jawaban Benar: C</option>
+          <option value="D">Jawaban Benar: D</option>
+        </select>
+        <input type="text" id="kodeKelasSoal" placeholder="Kode Kelas" class="w-full px-2 py-1 border rounded mb-2" />
+        <input type="text" id="passwordSoal" placeholder="Password Soal" class="w-full px-2 py-1 border rounded mb-2" />
+        <div class="flex gap-2">
+          <button onclick="simpanSoal()" class="bg-purple-600 text-white px-3 py-1 rounded">Simpan</button>
+          <button onclick="toggleForm('soal')" class="bg-gray-300 px-3 py-1 rounded">Batal</button>
+        </div>
+      </section>
+
+      <!-- Daftar Kelas & Soal -->
+      <div id="daftarData" class="bg-white p-4 rounded shadow"></div>
+    </section>
+  </main>
+
+  <script>
+    // 🔥 GANTI DENGAN KONFIGURASI FIREBASE-MU
+    const firebaseConfig = {
+      apiKey: "AIzaSy...",
+      authDomain: "edusmart.firebaseapp.com",
+      projectId: "edusmart",
+      storageBucket: "edusmart.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef123456"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let KODE_GURU = '';
+    let NAMA_GURU = '';
+
+    function generateKode() {
+      return 'GURU-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+    }
+
+    function daftarGuru() {
+      const nama = document.getElementById('namaGuru').value.trim();
+      if (!nama) return alert('Nama tidak boleh kosong!');
+      KODE_GURU = generateKode();
+      NAMA_GURU = nama;
+
+      db.collection('guru').doc(KODE_GURU).set({
+        nama,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        tampilkanDashboard();
+        window.history.pushState({}, '', `?kode=${KODE_GURU}`);
+      });
+    }
+
+    function tampilkanDashboard() {
+      document.getElementById('namaTampil').textContent = NAMA_GURU;
+      document.getElementById('kodeTampil').textContent = KODE_GURU;
+      document.getElementById('form-section').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      muatData();
+    }
+
+    function toggleForm(jenis) {
+      document.getElementById('form-kelas').classList.toggle('hidden', jenis !== 'kelas');
+      document.getElementById('form-soal').classList.toggle('hidden', jenis !== 'soal');
+    }
+
+    function simpanKelas() {
+      const nama = document.getElementById('namaKelas').value.trim();
+      const desc = document.getElementById('descKelas').value.trim();
+      if (!nama) return alert('Nama kelas wajib diisi!');
+
+      db.collection('kelas').add({
+        kodeGuru: KODE_GURU,
+        nama,
+        desc,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        toggleForm('kelas');
+        muatData();
+      });
+    }
+
+    function simpanSoal() {
+      const teks = document.getElementById('teksSoal').value.trim();
+      const A = document.getElementById('opsiA').value.trim();
+      const B = document.getElementById('opsiB').value.trim();
+      const C = document.getElementById('opsiC').value.trim();
+      const D = document.getElementById('opsiD').value.trim();
+      const benar = document.getElementById('jawabanBenar').value;
+      const kodeKelas = document.getElementById('kodeKelasSoal').value.trim();
+      const password = document.getElementById('passwordSoal').value.trim();
+
+      if (!teks || !A || !B || !C || !D || !kodeKelas || !password) {
+        return alert('Semua field wajib diisi!');
+      }
+
+      db.collection('soal').add({
+        kodeGuru: KODE_GURU,
+        teks,
+        opsi: { A, B, C, D },
+        benar,
+        kodeKelas,
+        password,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        toggleForm('soal');
+        muatData();
+      });
+    }
+
+    function muatData() {
+      // Muat kelas
+      let html = '<h3 class="font-bold mb-2">Kelas Anda:</h3><ul class="list-disc pl-5">';
+      db.collection('kelas').where('kodeGuru', '==', KODE_GURU).get().then(snapshot => {
+        if (snapshot.empty) {
+          html += '<li class="text-gray-500">Belum ada kelas</li>';
+        } else {
+          snapshot.forEach(doc => {
+            const k = doc.data();
+            html += `<li>${k.nama} ${k.desc ? ` - ${k.desc}` : ''}</li>`;
+          });
+        }
+        html += '</ul>';
+
+        // Muat soal
+        html += '<h3 class="font-bold mt-4 mb-2">Soal Anda:</h3><ul class="list-disc pl-5">';
+        db.collection('soal').where('kodeGuru', '==', KODE_GURU).get().then(snap => {
+          if (snap.empty) {
+            html += '<li class="text-gray-500">Belum ada soal</li>';
+          } else {
+            snap.forEach(doc => {
+              const s = doc.data();
+              html += `<li>${s.teks} (Kelas: ${s.kodeKelas})</li>`;
+            });
+          }
+          html += '</ul>';
+
+          // Muat hasil ujian
+          html += '<h3 class="font-bold mt-4 mb-2">Hasil Ujian Siswa:</h3><ul class="list-disc pl-5">';
+          db.collection('hasil').where('kodeGuru', '==', KODE_GURU).get().then(hasilSnap => {
+            if (hasilSnap.empty) {
+              html += '<li class="text-gray-500">Belum ada hasil</li>';
+            } else {
+              hasilSnap.forEach(doc => {
+                const h = doc.data();
+                html += `<li>${h.namaSiswa} - Kelas: ${h.kodeKelas} - Nilai: ${h.nilai}</li>`;
+              });
+            }
+            html += '</ul>';
+            document.getElementById('daftarData').innerHTML = html;
+          });
+        });
+      });
+    }
+
+    // Cek apakah kode guru ada di URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const kode = urlParams.get('kode');
+    if (kode) {
+      KODE_GURU = kode;
+      db.collection('guru').doc(kode).get().then(doc => {
+        if (doc.exists) {
+          NAMA_GURU = doc.data().nama;
+          tampilkanDashboard();
+        } else {
+          alert('Kode guru tidak ditemukan!');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

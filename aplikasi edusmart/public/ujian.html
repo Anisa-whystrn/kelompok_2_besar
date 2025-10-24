@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ujian - Edusmart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <!-- PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body class="bg-gray-50">
+  <header class="bg-gradient-to-r from-green-600 to-emerald-700 text-white py-4 px-4 text-center shadow-md">
+    <h1 class="text-2xl font-bold">Edusmart — Ujian Siswa</h1>
+  </header>
+
+  <main class="max-w-lg mx-auto px-4 py-8">
+    <!-- Form -->
+    <section id="form-section" class="bg-white p-6 rounded-xl shadow">
+      <h2 class="text-xl font-bold mb-4">Masukkan Data Ujian</h2>
+      <input type="text" id="namaSiswa" placeholder="Nama Lengkap" class="w-full px-3 py-2 border rounded mb-3" />
+      <input type="text" id="kodeKelas" placeholder="Kode Kelas" class="w-full px-3 py-2 border rounded mb-3" />
+      <input type="password" id="passwordSoal" placeholder="Password Soal" class="w-full px-3 py-2 border rounded mb-4" />
+      <button onclick="mulaiUjian()" class="w-full bg-green-600 text-white py-2 rounded">Mulai Ujian</button>
+    </section>
+
+    <!-- Soal -->
+    <section id="soal-section" class="hidden mt-6 bg-white p-6 rounded-xl shadow">
+      <div id="soalContainer"></div>
+      <button onclick="kirimJawaban()" class="w-full bg-blue-600 text-white py-2 rounded mt-4">Kirim & Lihat Nilai</button>
+    </section>
+
+    <!-- Hasil -->
+    <section id="hasil-section" class="hidden mt-6 bg-white p-6 rounded-xl shadow text-center">
+      <div id="hasil-ujian">
+        <h2 class="text-2xl font-bold text-green-600 mb-2">✅ Ujian Selesai!</h2>
+        <p>Nama: <span id="nama-siswa-cetak"></span></p>
+        <p>Nilai: <span id="nilaiAkhir"></span></p>
+        <div id="detailJawaban" class="mt-4 text-left"></div>
+      </div>
+      <button onclick="cetakPDF()" class="mt-6 bg-red-600 text-white px-4 py-2 rounded">
+        📄 Cetak Hasil (PDF)
+      </button>
+    </section>
+  </main>
+
+  <script>
+    // 🔥 GANTI DENGAN KONFIGURASI FIREBASE-MU
+    const firebaseConfig = {
+      apiKey: "AIzaSy...",
+      authDomain: "edusmart.firebaseapp.com",
+      projectId: "edusmart",
+      storageBucket: "edusmart.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef123456"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let soalList = [];
+    let KODE_GURU = '';
+
+    function mulaiUjian() {
+      const nama = document.getElementById('namaSiswa').value.trim();
+      const kodeKelas = document.getElementById('kodeKelas').value.trim();
+      const password = document.getElementById('passwordSoal').value.trim();
+      if (!nama || !kodeKelas || !password) return alert('Semua field wajib diisi!');
+
+      db.collection('soal')
+        .where('kodeKelas', '==', kodeKelas)
+        .where('password', '==', password)
+        .get()
+        .then(snapshot => {
+          if (snapshot.empty) return alert('Kode kelas atau password salah!');
+          soalList = [];
+          snapshot.forEach(doc => {
+            soalList.push({ id: doc.id, ...doc.data() });
+            KODE_GURU = doc.data().kodeGuru;
+          });
+          tampilkanSoal();
+        });
+    }
+
+    function tampilkanSoal() {
+      let html = '';
+      soalList.forEach((s, i) => {
+        html += `
+          <div class="mb-4">
+            <p class="font-medium">${i+1}. ${s.teks}</p>
+            ${Object.entries(s.opsi).map(([key, val]) => `
+              <label class="block">
+                <input type="radio" name="soal${i}" value="${key}" class="mr-2"> ${key}. ${val}
+              </label>
+            `).join('')}
+          </div>
+        `;
+      });
+      document.getElementById('soalContainer').innerHTML = html;
+      document.getElementById('form-section').classList.add('hidden');
+      document.getElementById('soal-section').classList.remove('hidden');
+    }
+
+    function kirimJawaban() {
+      const namaSiswa = document.getElementById('namaSiswa').value;
+      document.getElementById('nama-siswa-cetak').textContent = namaSiswa;
+
+      let benar = 0;
+      let detail = '';
+      soalList.forEach((s, i) => {
+        const pilih = document.querySelector(`input[name="soal${i}"]:checked`);
+        const jawaban = pilih ? pilih.value : null;
+        const isBenar = jawaban === s.benar;
+        if (isBenar) benar++;
+        detail += `<p>Soal ${i+1}: ${isBenar ? '✅ Benar' : `❌ Salah (Jawaban: ${s.benar})`}</p>`;
+      });
+
+      const nilai = Math.round((benar / soalList.length) * 100);
+      document.getElementById('nilaiAkhir').textContent = nilai;
+      document.getElementById('detailJawaban').innerHTML = detail;
+
+      // Simpan ke Firebase
+      db.collection('hasil').add({
+        kodeGuru: KODE_GURU,
+        kodeKelas: document.getElementById('kodeKelas').value.trim(),
+        namaSiswa,
+        nilai,
+        waktu: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      document.getElementById('soal-section').classList.add('hidden');
+      document.getElementById('hasil-section').classList.remove('hidden');
+    }
+
+    function cetakPDF() {
+      const { jsPDF } = window.jspdf;
+      const element = document.getElementById('hasil-ujian');
+      html2canvas(element).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const width = pdf.internal.pageSize.getWidth();
+        const height = (canvas.height * width) / canvas.width;
+        pdf.addImage(imgData, 'PNG', 10, 10, width - 20, height * (width - 20) / width);
+        pdf.save('hasil_ujian_edusmart.pdf');
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Masuk sebagai Guru | Edusmart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gradient-to-b from-blue-100 to-blue-300">
+
+  <div class="bg-white shadow-lg rounded-2xl p-8 w-96 text-center space-y-5">
+    <h1 class="text-2xl font-bold text-blue-600">Masuk sebagai Guru</h1>
+
+    <!-- FORM DAFTAR GURU BARU -->
+    <div>
+      <input id="namaGuru" type="text" placeholder="Masukkan nama Anda"
+        class="border border-gray-300 rounded w-full p-2 mb-2 focus:ring-2 focus:ring-blue-400 focus:outline-none">
+      <button id="daftarBtn"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded w-full">
+        Daftar Guru Baru
+      </button>
+    </div>
+
+    <p class="text-gray-400 text-sm">atau</p>
+
+    <!-- FORM LOGIN KODE LAMA -->
+    <div>
+      <input id="kodeGuru" type="text" placeholder="Masukkan kode guru (contoh: GURU-AB12CD)"
+        class="border border-gray-300 rounded w-full p-2 mb-2 focus:ring-2 focus:ring-green-400 focus:outline-none uppercase">
+      <button id="loginBtn"
+        class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded w-full">
+        Masuk dengan Kode
+      </button>
+    </div>
+
+    <p id="status" class="mt-3 text-gray-500 text-sm"></p>
+  </div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // Konfigurasi Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA2mNlYkfpj-caKETiDVpbw1MjPa2vxNfI",
+      authDomain: "edusmart-7b6a4.firebaseapp.com",
+      projectId: "edusmart-7b6a4",
+      storageBucket: "edusmart-7b6a4.firebasestorage.app",
+      messagingSenderId: "228194268455",
+      appId: "1:228194268455:web:2b86342cc8d84e5b296502",
+      measurementId: "G-J9B6W2Z0VC"
+    };
+
+    // 🔥 Inisialisasi Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Elemen DOM
+    const namaInput = document.getElementById("namaGuru");
+    const kodeInput = document.getElementById("kodeGuru");
+    const daftarBtn = document.getElementById("daftarBtn");
+    const loginBtn = document.getElementById("loginBtn");
+    const status = document.getElementById("status");
+
+    // 🔹 Fungsi buat kode acak unik
+    function buatKodeGuru() {
+      const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+      return `GURU-${rand}`;
+    }
+
+    // 🔹 Guru baru daftar
+    daftarBtn.addEventListener("click", async () => {
+      const nama = namaInput.value.trim();
+      if (!nama) return alert("Nama tidak boleh kosong!");
+
+      const kode = buatKodeGuru();
+      status.textContent = "⏳ Menyimpan data...";
+      daftarBtn.disabled = true;
+
+      try {
+        await setDoc(doc(db, "guru", kode), {
+          nama: nama,
+          dibuat: new Date().toISOString()
+        });
+
+        localStorage.setItem("kodeGuru", kode);
+        alert(`✅ Berhasil! Simpan kode Anda: ${kode}`);
+        window.location.href = `dashboard.html?kode=${kode}`;
+      } catch (error) {
+        console.error(error);
+        alert("Terjadi kesalahan saat menyimpan data.");
+      } finally {
+        daftarBtn.disabled = false;
+        status.textContent = "";
+      }
+    });
+
+    // 🔹 Login pakai kode lama
+    loginBtn.addEventListener("click", async () => {
+      const kode = kodeInput.value.trim().toUpperCase();
+      if (!kode.startsWith("GURU-")) return alert("Kode guru tidak valid!");
+
+      status.textContent = "🔍 Memeriksa kode...";
+      loginBtn.disabled = true;
+
+      try {
+        const ref = doc(db, "guru", kode);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+          localStorage.setItem("kodeGuru", kode);
+          alert(`✅ Selamat datang kembali, ${snap.data().nama}!`);
+          window.location.href = `dashboard.html?kode=${kode}`;
+        } else {
+          alert("❌ Kode tidak ditemukan!");
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Terjadi kesalahan saat login.");
+      } finally {
+        loginBtn.disabled = false;
+        status.textContent = "";
+      }
+    });
+
+    // 🔹 Cek kalau guru sudah login sebelumnya
+    const kodeTersimpan = localStorage.getItem("kodeGuru");
+    if (kodeTersimpan) {
+      window.location.href = `dashboard.html?kode=${kodeTersimpan}`;
+    }
+  </script>
+</body>
+</html>
